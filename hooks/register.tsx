@@ -10,31 +10,50 @@ const BAR_HIDDEN = { plugin: 'themes', key: 'barHidden' } as const
 
 const nameOf = (id: string): string => findTheme(id)?.name ?? 'App default'
 
-/** Paints a theme in this session, without saving it. */
-const paint = async ($: EngineInterface, id: string): Promise<void> => {
+const why = (err: unknown): string => (err instanceof Error ? err.message : String(err))
+
+/**
+ * Paints a theme in this session, without saving it, and says why when the
+ * app did not draw it. The bar's selection moves first, so a paint that fails
+ * never leaves the bar stuck on the old theme.
+ */
+const paint = async ($: EngineInterface, id: string): Promise<string | undefined> => {
   const theme = findTheme(id)
+
+  await $.state.set(CURRENT, theme?.id ?? OFF)
+  $.ui.status(undefined)
 
   if (theme === undefined) {
     await $.theme.clear()
-  } else {
-    const { look, unpainted } = lookFor(theme)
 
-    if (unpainted !== undefined) {
-      $.ui.toast(unpainted)
-    }
-    // Before the window attaches this reports isDrawn: false, yet the theme
-    // stands and is drawn on attach (and session.attach repaints it anyway).
-    await $.theme.set(look)
+    return undefined
   }
-  $.ui.status(undefined)
-  await $.state.set(CURRENT, theme?.id ?? OFF)
+  const { look, unpainted } = lookFor(theme)
+
+  if (unpainted !== undefined) {
+    $.ui.toast(unpainted)
+  }
+  // Before the window attaches this reports isDrawn: false, yet the theme
+  // stands and is drawn on attach (and session.attach repaints it anyway).
+  const result = await $.theme.set(look)
+
+  return result.isDrawn ? undefined : result.reason
 }
 
 /** Paints a theme and saves it, so every chat (open or new) follows. */
 const choose = async ($: EngineInterface, id: string): Promise<void> => {
-  await $.store.set('current', id)
-  await paint($, id)
-  $.ui.toast(`Theme: ${nameOf(id)}`)
+  try {
+    await $.store.set('current', id)
+  } catch (err) {
+    $.ui.toast(`Themes: couldn't save your choice (${why(err)})`)
+  }
+  try {
+    const notDrawn = await paint($, id)
+
+    $.ui.toast(notDrawn === undefined ? `Theme: ${nameOf(id)}` : `Theme: ${nameOf(id)}, but the app didn't draw it: ${notDrawn}`)
+  } catch (err) {
+    $.ui.toast(`Themes: couldn't apply ${nameOf(id)} (${why(err)})`)
+  }
 }
 
 const saved = async ($: EngineInterface): Promise<string> => {

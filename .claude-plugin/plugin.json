@@ -1,6 +1,6 @@
 {
   "name": "themes",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Ten animated app themes (Cyberpunk, Abyss, Sakura, Aurora, Firefly, Dunes, Phosphor, Hellforge, Straw Hat, Haki) with a one-click theme bar and a /themes picker.",
   "license": "MIT",
   "types": "./types/index.d.ts"
